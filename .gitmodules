@@ -1,0 +1,42 @@
+[submodule "microservice/vendor/github.com/beorn7/perks"]
+	path = microservice/vendor/github.com/beorn7/perks
+	url = https://github.com/beorn7/perks
+[submodule "microservice/vendor/github.com/golang/protobuf"]
+	path = microservice/vendor/github.com/golang/protobuf
+	url = https://github.com/golang/protobuf
+[submodule "microservice/vendor/github.com/gonum/blas"]
+	path = microservice/vendor/github.com/gonum/blas
+	url = https://github.com/gonum/blas
+[submodule "microservice/vendor/github.com/gonum/floats"]
+	path = microservice/vendor/github.com/gonum/floats
+	url = https://github.com/gonum/floats
+[submodule "microservice/vendor/github.com/gonum/internal"]
+	path = microservice/vendor/github.com/gonum/internal
+	url = https://github.com/gonum/internal
+[submodule "microservice/vendor/github.com/gonum/lapack"]
+	path = microservice/vendor/github.com/gonum/lapack
+	url = https://github.com/gonum/lapack
+[submodule "microservice/vendor/github.com/gonum/mathext"]
+	path = microservice/vendor/github.com/gonum/mathext
+	url = https://github.com/gonum/mathext
+[submodule "microservice/vendor/github.com/gonum/matrix"]
+	path = microservice/vendor/github.com/gonum/matrix
+	url = https://github.com/gonum/matrix
+[submodule "microservice/vendor/github.com/gonum/stat"]
+	path = microservice/vendor/github.com/gonum/stat
+	url = https://github.com/gonum/stat
+[submodule "microservice/vendor/github.com/matttproud/golang_protobuf_extensions"]
+	path = microservice/vendor/github.com/matttproud/golang_protobuf_extensions
+	url = https://github.com/matttproud/golang_protobuf_extensions
+[submodule "microservice/vendor/github.com/prometheus/client_golang"]
+	path = microservice/vendor/github.com/prometheus/client_golang
+	url = https://github.com/prometheus/client_golang
+[submodule "microservice/vendor/github.com/prometheus/client_model"]
+	path = microservice/vendor/github.com/prometheus/client_model
+	url = https://github.com/prometheus/client_model
+[submodule "microservice/vendor/github.com/prometheus/common"]
+	path = microservice/vendor/github.com/prometheus/common
+	url = https://github.com/prometheus/common
+[submodule "microservice/vendor/github.com/prometheus/procfs"]
+	path = microservice/vendor/github.com/prometheus/procfs
+	url = https://github.com/prometheus/procfs
