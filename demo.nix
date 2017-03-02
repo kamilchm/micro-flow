@@ -6,7 +6,7 @@ let
     virtualbox.headless = true;
   };
 
-  microserver = ports: 
+  microserver = cfg: 
   { config, pkgs, lib, ... }:
   { 
     nixpkgs.config = {
@@ -37,7 +37,17 @@ let
     };
 
     environment.etc = [
-      { source = pkgs.writeText "linkerd.yaml" ''
+      { source = pkgs.writeText "app" (
+          lib.foldl' (lines: cfg: lines + "localhost ${toString cfg.port}\n") "" cfg.instances
+        );
+        target = "linkerd/disco/app";
+      }
+    ];
+
+    systemd.services = {
+      linkerd =
+      let
+        cfgFile = pkgs.writeText "linkerd.yaml" ''
           namers:
             - kind: io.l5d.fs
               rootDir: /etc/linkerd/disco
@@ -54,41 +64,26 @@ let
               kind: io.l5d.retryableRead5XX
             client:
               loadBalancer:
-                kind: ewma
-              failureAccrual:
-                kind: io.l5d.successRate
-                successRate: 0.9
-                requests: 20
-                backoff:
-                  kind: constant
-                  ms: 10000
-
+                kind: roundRobin
+                #kind: ewma
           admin:
             ip: 0.0.0.0
             port: 8090
         '';
-        target = "linkerd/linkerd.yaml";
-      }
-      { source = pkgs.writeText "app" (
-          lib.foldl' (lines: port: lines + "localhost ${toString port}\n") "" ports
-        );
-        target = "linkerd/disco/app";
-      }
-    ];
-
-    systemd.services = {
-      linkerd = {
+      in
+      {
         description = "Linkerd";
         after = [ "network.target" ];
         wantedBy = [ "multi-user.target" ];
 
         serviceConfig = {
-          ExecStart = "${pkgs.linkerd}/bin/linkerd /etc/linkerd/linkerd.yaml";
+          ExecStart = "${pkgs.linkerd}/bin/linkerd ${cfgFile}";
+          Restart = "always";
         };
       };
-    } // lib.listToAttrs (map (port:
+    } // lib.listToAttrs (map (i:
       let
-        portStr = toString port;
+        portStr = toString i.port;
       in {
       name = "microservice_${portStr}";
       value = {
@@ -97,30 +92,54 @@ let
         wantedBy = [ "multi-user.target" ];
 
         serviceConfig = {
-          ExecStart = "${pkgs.microservice}/bin/microservice -port ${toString portStr}";
+          ExecStart = ''
+            ${pkgs.microservice}/bin/microservice \
+              ${lib.optionalString (cfg ? alpha) "-alpha=${cfg.alpha}"} \
+              ${lib.optionalString (cfg ? beta) "-beta=${cfg.beta}"} \
+              ${lib.optionalString (i ? errors) "-errors=${i.errors}"} \
+              ${lib.optionalString (i ? speed) "-speed=${i.speed}"} \
+              -port ${toString portStr}
+            '';
         };
       };
-    }) ports);
+    }) cfg.instances);
 
-    networking.firewall.allowedTCPPorts = ports ++ [ 8080 8090 ];
+    networking.firewall.allowedTCPPorts = (map (cfg: cfg.port) cfg.instances) ++ [ 8080 8090 ];
 
     deployment = vbox;
   };
 
-  layer1Config = [ 4444 4445 4446 ];
-  layer2Config = [ 3333 3334 3335 3336 ];
+  #
+  # TEST CONFIGURATIONS
+  #
+
+  testOneServiceLayer1 = {
+    alpha = "20";
+    beta = "194.5";
+    instances = [
+      { port = 4444; speed = "0.9"; }
+      { port = 4445; speed = "0.6"; }
+      { port = 4446; speed = "0.5"; }
+      { port = 4447; speed = "0.4"; }
+      { port = 4448; speed = "0.7"; }
+      { port = 4449; speed = "1.0"; }
+      { port = 4450; speed = "0.2"; }
+      { port = 4451; speed = "1.0"; }
+    ];
+  };
+
+  layer1Config = testOneServiceLayer1;
 in
 rec {
   network.description = "Microservices";
 
   layer1 = microserver layer1Config;
-  layer2 = microserver layer2Config;
 
   client = { config, pkgs, ... }:
   let
     url = "http://layer1:8080";
-    qps = "100";
-    concurrency = "10";
+    qps = "2";
+    concurrency = "150";
   in
   {
     nixpkgs.config = {
@@ -166,17 +185,11 @@ rec {
       {
         job_name = "layer1";
         static_configs = [{
-          targets = map (port: "layer1:${toString port}") layer1Config;
+          targets = map (c: "layer1:${toString c.port}") layer1Config.instances;
         }];
       }
       {
-        job_name = "layer2";
-        static_configs = [{
-          targets = map (port: "layer2:${toString port}") layer2Config;
-        }];
-      }
-      {
-        job_name = "slow_cooker";
+        job_name = "client";
         static_configs = [{
           targets = [ "client:8080" ];
         }];
