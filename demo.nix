@@ -64,8 +64,8 @@ let
               kind: io.l5d.retryableRead5XX
             client:
               loadBalancer:
-                kind: roundRobin
-                #kind: ewma
+                kind: ${cfg.lbAlgo}
+                decayTimeMs: 10000
           admin:
             ip: 0.0.0.0
             port: 8090
@@ -98,6 +98,7 @@ let
               ${lib.optionalString (cfg ? beta) "-beta=${cfg.beta}"} \
               ${lib.optionalString (i ? errors) "-errors=${i.errors}"} \
               ${lib.optionalString (i ? speed) "-speed=${i.speed}"} \
+              ${lib.optionalString (cfg ? nextHop) "-next-hop=${cfg.nextHop}"} \
               -port ${toString portStr}
             '';
         };
@@ -113,33 +114,40 @@ let
   # TEST CONFIGURATIONS
   #
 
-  testOneServiceLayer1 = {
-    alpha = "20";
-    beta = "194.5";
+  testFiveHopsLayer = {
+    alpha = "3.5";
+    beta = "34.6";
+    lbAlgo = "ewma";
     instances = [
-      { port = 4444; speed = "0.9"; }
-      { port = 4445; speed = "0.6"; }
-      { port = 4446; speed = "0.5"; }
-      { port = 4447; speed = "0.4"; }
-      { port = 4448; speed = "0.7"; }
-      { port = 4449; speed = "1.0"; }
-      { port = 4450; speed = "0.2"; }
-      { port = 4451; speed = "1.0"; }
+      { port = 4444; }
+      { port = 4445; }
+      { port = 4446; }
+      { port = 4447; }
+      { port = 4448; }
+      { port = 4449; }
     ];
   };
 
-  layer1Config = testOneServiceLayer1;
+  layer1Config = testFiveHopsLayer // { nextHop = "http://layer2:8080/"; };
+  layer2Config = testFiveHopsLayer // { nextHop = "http://layer3:8080/"; };
+  layer3Config = testFiveHopsLayer // { nextHop = "http://layer4:8080/"; };
+  layer4Config = testFiveHopsLayer // { nextHop = "http://layer5:8080/"; };
+  layer5Config = testFiveHopsLayer;
 in
 rec {
   network.description = "Microservices";
 
   layer1 = microserver layer1Config;
+  layer2 = microserver layer2Config;
+  layer3 = microserver layer3Config;
+  layer4 = microserver layer4Config;
+  layer5 = microserver layer5Config;
 
   client = { config, pkgs, ... }:
   let
-    url = "http://layer1:8080";
-    qps = "2";
-    concurrency = "150";
+    url = "http://layer1:8080?hops=5";
+    qps = "1";
+    concurrency = "50";
   in
   {
     nixpkgs.config = {
@@ -186,6 +194,30 @@ rec {
         job_name = "layer1";
         static_configs = [{
           targets = map (c: "layer1:${toString c.port}") layer1Config.instances;
+        }];
+      }
+      {
+        job_name = "layer2";
+        static_configs = [{
+          targets = map (c: "layer2:${toString c.port}") layer2Config.instances;
+        }];
+      }
+      {
+        job_name = "layer3";
+        static_configs = [{
+          targets = map (c: "layer3:${toString c.port}") layer3Config.instances;
+        }];
+      }
+      {
+        job_name = "layer4";
+        static_configs = [{
+          targets = map (c: "layer4:${toString c.port}") layer4Config.instances;
+        }];
+      }
+      {
+        job_name = "layer5";
+        static_configs = [{
+          targets = map (c: "layer5:${toString c.port}") layer5Config.instances;
         }];
       }
       {
