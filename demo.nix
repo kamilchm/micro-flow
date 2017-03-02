@@ -117,7 +117,7 @@ let
   testFiveHopsLayer = {
     alpha = "3.5";
     beta = "34.6";
-    lbAlgo = "ewma";
+    lbAlgo = "roundRobin";
     instances = [
       { port = 4444; }
       { port = 4445; }
