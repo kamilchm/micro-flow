@@ -70,7 +70,6 @@ let
             client:
               loadBalancer:
                 kind: ${cfg.lbAlgo}
-                decayTimeMs: 10000
           admin:
             ip: 0.0.0.0
             port: 8090
