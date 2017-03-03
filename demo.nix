@@ -5,6 +5,11 @@ let
     virtualbox.vcpu = 1; # number of cpus
     virtualbox.headless = true;
   };
+  qemu = {
+    targetEnv = "libvirtd";
+    libvirtd.headless = true;
+    libvirtd.memorySize = 1024;
+  };
 
   microserver = cfg: 
   { config, pkgs, lib, ... }:
@@ -107,7 +112,7 @@ let
 
     networking.firewall.allowedTCPPorts = (map (cfg: cfg.port) cfg.instances) ++ [ 8080 8090 ];
 
-    deployment = vbox;
+    deployment = qemu;
   };
 
   #
@@ -178,7 +183,7 @@ rec {
 
     networking.firewall.allowedTCPPorts = [ 8080 ];
 
-    deployment = vbox;
+    deployment = qemu;
   };
 
   dashboard = { config, pkgs, ... }:
@@ -236,6 +241,6 @@ rec {
 
     networking.firewall.allowedTCPPorts = [ 3000 9090 ];
 
-    deployment = vbox;
+    deployment = qemu;
   };
 }
