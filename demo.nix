@@ -182,6 +182,16 @@ in
   };
 
   dashboard = { config, pkgs, ... }:
+  let
+    prometheus_ds = builtins.toFile "prometheus_ds.json" ''{
+      "access": "proxy",
+      "isDefault": true,
+      "jsonData": {},
+      "name": "prometheus",
+      "type": "prometheus",
+      "url": "http://dashboard:9090"
+    }'';
+  in
   {
     services.prometheus = {
       enable = true;
@@ -206,6 +216,24 @@ in
     services.grafana = {
       enable = true;
       addr = "0.0.0.0";
+    };
+
+    systemd.services.prometheus_datasource = {
+      description = "default datasource used in Grafana";
+      after = [ "grafana.service" ];
+      wantedBy = [ "multi-user.target" ];
+
+      path = [ pkgs.curl ];
+      script = ''
+        curl -sX POST -u admin:admin -d @${prometheus_ds} \
+          -H "Content-Type: application/json" \
+          http://localhost:3000/api/datasources
+      '';
+
+      serviceConfig = {
+        Restart = "on-failure";
+        RestartSec = 5;
+      };
     };
 
     networking.firewall.allowedTCPPorts = [ 3000 9090 ];
