@@ -109,32 +109,21 @@ let
   };
 
   defaultLayerCfg = {
-    alpha = "3.5";
-    beta = "34.6";
+    alpha = "1.4";
+    beta = "20";
     lbAlgo = "roundRobin";
+    #lbAlgo = "ewma";
     instances = [
       { port = 4444; }
       { port = 4445; }
       { port = 4446; }
-      { port = 4447; }
-      { port = 4448; }
-      { port = 4449; }
     ];
   };
 
   layers = (map (cfg: defaultLayerCfg // cfg) [
     { name = "layer1"; nextHop = "http://layer2:8080/"; }
     { name = "layer2"; nextHop = "http://layer3:8080/"; }
-    { name = "layer3"; nextHop = "http://layer4:8080/";
-      instances = [
-        { port = 4444; }
-        { port = 4445; }
-        { port = 4446; }
-        { port = 4447; }
-        { port = 4448; }
-        { port = 4449; }
-      ];
-    }
+    { name = "layer3"; nextHop = "http://layer4:8080/"; }
     { name = "layer4"; nextHop = "http://layer5:8080/"; }
     { name = "layer5"; }
   ]);
@@ -145,9 +134,9 @@ in
 
   client = { config, pkgs, ... }:
   let
-    url = "http://layer1:8080?hops=5";
-    qps = "1";
-    concurrency = "50";
+    url = "http://layer1:8080?hops=4";
+    qps = "2";
+    concurrency = "60";
   in
   {
     nixpkgs.config = {
@@ -191,6 +180,8 @@ in
       "type": "prometheus",
       "url": "http://dashboard:9090"
     }'';
+
+    grafana_dashboard = ./Long_latency_tail.json;
   in
   {
     services.prometheus = {
@@ -218,8 +209,8 @@ in
       addr = "0.0.0.0";
     };
 
-    systemd.services.prometheus_datasource = {
-      description = "default datasource used in Grafana";
+    systemd.services.grafana_setup = {
+      description = "default datasource and dashboard for Grafana";
       after = [ "grafana.service" ];
       wantedBy = [ "multi-user.target" ];
 
@@ -228,6 +219,10 @@ in
         curl -sX POST -u admin:admin -d @${prometheus_ds} \
           -H "Content-Type: application/json" \
           http://localhost:3000/api/datasources
+
+        curl -sX POST -u admin:admin -d @${grafana_dashboard} \
+          -H "Content-Type: application/json" \
+          http://localhost:3000/api/dashboards/db
       '';
 
       serviceConfig = {

@@ -51,7 +51,7 @@ func (glh *gammaLatencyHello) handleHello(w http.ResponseWriter, r *http.Request
 
 	respTime := glh.gamma.Rand() / glh.speed
 	time.Sleep(time.Duration(int(1000*respTime)) * time.Millisecond)
-	rLatency.Observe(respTime)
+	rLatency.Observe(1000 * respTime)
 
 	hops := r.URL.Query().Get("hops")
 	var fromHop []byte
@@ -97,8 +97,8 @@ func main() {
 
 	errors := flag.Float64("errors", 0.0, "error rate for service responses")
 
-	alpha := flag.Float64("alpha", 2.5, "alpha parameter in gamma distribution")
-	beta := flag.Float64("beta", 34.6, "beta parameter in gamma distribution")
+	alpha := flag.Float64("alpha", 1.4, "alpha parameter in gamma distribution")
+	beta := flag.Float64("beta", 20.0, "beta parameter in gamma distribution")
 
 	speed := flag.Float64("speed", 1.0, "how fast is that microservice")
 
