@@ -1,10 +1,4 @@
 let
-  vbox =  {
-    targetEnv = "virtualbox";
-    virtualbox.memorySize = 1024; # megabytes
-    virtualbox.vcpu = 1; # number of cpus
-    virtualbox.headless = true;
-  };
   qemu = {
     targetEnv = "libvirtd";
     libvirtd.headless = true;
@@ -43,7 +37,7 @@ let
 
     environment.etc = [
       { source = pkgs.writeText "app" (
-          lib.foldl' (lines: cfg: lines + "localhost ${toString cfg.port}\n") "" cfg.instances
+          lib.foldl' (lines: i: lines + "localhost ${toString i.port}\n") "" cfg.instances
         );
         target = "linkerd/disco/app";
       }
@@ -109,16 +103,12 @@ let
       };
     }) cfg.instances);
 
-    networking.firewall.allowedTCPPorts = (map (cfg: cfg.port) cfg.instances) ++ [ 8080 8090 ];
+    networking.firewall.allowedTCPPorts = (map (i: i.port) cfg.instances) ++ [ 8080 8090 ];
 
     deployment = qemu;
   };
 
-  #
-  # TEST CONFIGURATIONS
-  #
-
-  testFiveHopsLayer = {
+  defaultLayerCfg = {
     alpha = "3.5";
     beta = "34.6";
     lbAlgo = "roundRobin";
@@ -132,20 +122,26 @@ let
     ];
   };
 
-  layer1Config = testFiveHopsLayer // { nextHop = "http://layer2:8080/"; };
-  layer2Config = testFiveHopsLayer // { nextHop = "http://layer3:8080/"; };
-  layer3Config = testFiveHopsLayer // { nextHop = "http://layer4:8080/"; };
-  layer4Config = testFiveHopsLayer // { nextHop = "http://layer5:8080/"; };
-  layer5Config = testFiveHopsLayer;
-in
-rec {
-  network.description = "Microservices";
+  layers = (map (cfg: defaultLayerCfg // cfg) [
+    { name = "layer1"; nextHop = "http://layer2:8080/"; }
+    { name = "layer2"; nextHop = "http://layer3:8080/"; }
+    { name = "layer3"; nextHop = "http://layer4:8080/";
+      instances = [
+        { port = 4444; }
+        { port = 4445; }
+        { port = 4446; }
+        { port = 4447; }
+        { port = 4448; }
+        { port = 4449; }
+      ];
+    }
+    { name = "layer4"; nextHop = "http://layer5:8080/"; }
+    { name = "layer5"; }
+  ]);
 
-  layer1 = microserver layer1Config;
-  layer2 = microserver layer2Config;
-  layer3 = microserver layer3Config;
-  layer4 = microserver layer4Config;
-  layer5 = microserver layer5Config;
+in
+(builtins.listToAttrs (map (layer: {name = layer.name; value = microserver layer; }) layers)) // rec {
+  network.description = "Microservices";
 
   client = { config, pkgs, ... }:
   let
@@ -193,44 +189,18 @@ rec {
         scrape_interval = "5s";
         scrape_timeout = "2s";
       };
-      scrapeConfigs = [
-      {
-        job_name = "layer1";
+      scrapeConfigs = (map (layer: {
+        job_name = layer.name;
         static_configs = [{
-          targets = map (c: "layer1:${toString c.port}") layer1Config.instances;
+          targets = map (i: "${layer.name}:${toString i.port}") layer.instances;
         }];
-      }
-      {
-        job_name = "layer2";
-        static_configs = [{
-          targets = map (c: "layer2:${toString c.port}") layer2Config.instances;
-        }];
-      }
-      {
-        job_name = "layer3";
-        static_configs = [{
-          targets = map (c: "layer3:${toString c.port}") layer3Config.instances;
-        }];
-      }
-      {
-        job_name = "layer4";
-        static_configs = [{
-          targets = map (c: "layer4:${toString c.port}") layer4Config.instances;
-        }];
-      }
-      {
-        job_name = "layer5";
-        static_configs = [{
-          targets = map (c: "layer5:${toString c.port}") layer5Config.instances;
-        }];
-      }
-      {
+      }) layers)
+      ++ [{
         job_name = "client";
         static_configs = [{
           targets = [ "client:8080" ];
         }];
-      }
-      ];
+      }];
     };
 
     services.grafana = {
